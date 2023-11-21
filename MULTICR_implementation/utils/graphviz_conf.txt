@@ -1,0 +1,4 @@
+# The dir. where temporary files will be created.
+tempDirForWindows11 = "C:/Users/Motaz/Desktop/work/Graphviz/temp"
+# Where is your dot program located? It will be called externally.
+dotForWindows11 = "C:/Program Files/Graphviz/bin/dot.exe"
