@@ -6,3 +6,4 @@ We provide the necessary data to replicate the results of our study: <br />
 2- The studied [datasets](https://github.com/stilab-ets/multicr/tree/main/Datasets). <br />
 3- The used [R scripts](https://github.com/stilab-ets/multicr/blob/main/result%20analysis%20scripts/scott_knott.R) for the statistical analysis. <br />
 4- The obtained [results](https://github.com/stilab-ets/multicr/tree/main/result%20analysis%20scripts) with the utility scripts. 
+5- The implementation of [MULTICR](https://github.com/stilab-ets/multicr/tree/main/MULTICR_implementation)
