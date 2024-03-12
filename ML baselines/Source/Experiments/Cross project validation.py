@@ -1,6 +1,5 @@
 import sys
 sys.path.append('../../')
-sys.path.append('../../')
 from Config import *
 from lightgbm import LGBMClassifier
 from sklearn.preprocessing import StandardScaler
@@ -14,67 +13,110 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import ExtraTreesClassifier
 from Source.Util import Result
 from sklearn.model_selection import GridSearchCV
-from sklearn.metrics import matthews_corrcoef
+from sklearn.metrics import matthews_corrcoef, precision_score, recall_score
 import pickle
 from warnings import simplefilter
 from sklearn.exceptions import ConvergenceWarning
 simplefilter("ignore", category=ConvergenceWarning)
+best_n_estimators = 500
+best_learning_rate = 0.01
+seed = 2022
+'''
+,
 
-MODELS = {
-   
     'DT' : {
         'default' : DecisionTreeClassifier(),
         'hyperparameters': {
             'criterion': ['gini', 'entropy', 'log_loss'],
-            'max_depth' : [5, 10, None],
+            'max_depth' : [5, 10],
             'splitter' : ['best', 'random'], 
-            'class_weight' : ['balanced']
+            'class_weight' : ['balanced'],
+            'random_state': [seed]
         }
     },
        'RF' : {
-        'default' : RandomForestClassifier(),
+        'default' : RandomForestClassifier(n_jobs=-1),
         'hyperparameters' : {
             'criterion': ['gini', 'entropy', 'log_loss'],
             'max_depth' : [5, 10, None],
             'n_estimators' : [100, 500],
-            'class_weight' : ['balanced']
+            'class_weight' : ['balanced'],
+            'random_state': [seed]
         }
     },
- 'LR' : {
-        'default' : LogisticRegression(),
+ 
+    'LGBM' : {
+        'default' : LGBMClassifier(n_jobs=-1),
+        'hyperparameters' : {
+           'class_weight':['balanced'],
+            'n_estimators':[best_n_estimators],
+            'learning_rate':[best_learning_rate],
+            'subsample':[0.9], 
+            'subsample_freq':[1], 
+            'random_state':[np.random.randint(seed)]
+        }
+    },
+    'ET' : {
+        'default' : ExtraTreesClassifier(n_jobs=-1),
+        'hyperparameters' : {
+            'criterion': ['gini', 'entropy', 'log_loss'],
+            'max_depth' : [5, 10, None],
+            'n_estimators' : [100, 500],
+            'class_weight' : ['balanced'], 
+            'random_state': [seed]
+        }
+    }
+'''
+MODELS = {
+   'LR' : {
+        'default' : LogisticRegression(n_jobs=-1),
         'hyperparameters' : {
             'penalty' : ['l1','l2', 'elasticnet', 'none'],
             'C' : [0.01,0.1,1.0],
             'max_iter' : [10000],
             'class_weight' : ['balanced'],
-            'solver' : ['newton-cg', 'lbfgs', 'liblinear', 'sag', 'saga']
+            'solver' : ['newton-cg', 'lbfgs', 'liblinear', 'sag', 'saga'],
+            'random_state': [seed]
 
         }
     },
-    'LGBM' : {
-        'default' : LGBMClassifier(),
-        'hyperparameters' : {
-            
-            'learning_rate': [0.01, 0.1, 0.3],
-            'max_depth' : [5, 10, None],
-            'n_estimators' : [100, 500],
+        'DT' : {
+        'default' : DecisionTreeClassifier(),
+        'hyperparameters': {
+            'criterion': ['gini', 'entropy', 'log_loss'],
+            'max_depth' : [5, 10],
+            'splitter' : ['best', 'random'], 
             'class_weight' : ['balanced'],
-            'objective' : ['binary']
+            'random_state': [seed]
         }
     },
-    'ET' : {
-        'default' : ExtraTreesClassifier(),
+       'RF' : {
+        'default' : RandomForestClassifier(n_jobs=-1),
         'hyperparameters' : {
             'criterion': ['gini', 'entropy', 'log_loss'],
             'max_depth' : [5, 10, None],
             'n_estimators' : [100, 500],
-            'class_weight' : ['balanced']
+            'class_weight' : ['balanced'],
+            'random_state': [seed]
+        }
+    },
+    'LGBM' : {
+        'default' : get_best_model(),
+        'hyperparameters' : {
+        }
+    },
+    'ET' : {
+        'default' : ExtraTreesClassifier(n_jobs=-1),
+        'hyperparameters' : {
+            'criterion': ['gini', 'entropy', 'log_loss'],
+            'max_depth' : [5, 10, None],
+            'n_estimators' : [100, 500],
+            'class_weight' : ['balanced'], 
+            'random_state': [seed]
         }
     }
 }
 
-best_n_estimators = 500
-best_learning_rate = 0.01
 GP_cross_project_path = './cross_project_data/GP_data'
 
 os.makedirs(GP_cross_project_path,exist_ok=True)
@@ -136,6 +178,8 @@ def scenario_1_cross_project(models = MODELS,runs=runs):
                     y_pred = np.round(y_prob)
                     f1_m, f1_a = f1_score(y_true, y_pred), f1_score(y_true, y_pred, pos_label=0)
                     mcc = matthews_corrcoef(y_true, y_pred)
+                    prec_m, prec_a = precision_score(y_true, y_pred), precision_score(y_true, y_pred, pos_label=0) 
+                    recall_m, recall_a = recall_score(y_true, y_pred), recall_score(y_true, y_pred, pos_label=0) 
                     new_row = {
                         'Source' : current_project,
                         'Target' : other_project, 
@@ -143,7 +187,11 @@ def scenario_1_cross_project(models = MODELS,runs=runs):
                         'algorithm' : model_name,
                         'MCC': mcc,
                         'f1_A' : f1_a,
-                        'f1_M' : f1_m
+                        'f1_M' : f1_m, 
+                        'precision_m' : prec_m, 
+                        'precision_a': prec_a, 
+                        'recall_m': recall_m, 
+                        'recall_a': recall_a
                     }
                     results.append(new_row)
 
@@ -154,7 +202,7 @@ def scenario_1_cross_project(models = MODELS,runs=runs):
 
 def scenario_2_cross_project(models = MODELS,runs=runs): 
     results = []
-    for target_project in projects: 
+    for target_project in  projects: 
 
         print('Working on project',target_project)
         target_df = data[target_project]
@@ -185,16 +233,20 @@ def scenario_2_cross_project(models = MODELS,runs=runs):
                     'project_name' : target_project, 'algorithm' : model_name, 
                     'run' : run, 'model_id' : 'best_model_performance', 
                     'MCC' : matthews_corrcoef(target_df[target], y_pred),
-                     'f1_M' : f1_score(target_df[target], y_pred),
-                     'f1_A' : f1_score(target_df[target], y_pred, pos_label=0)
+                    'f1_M' : f1_score(target_df[target], y_pred),
+                    'f1_A' : f1_score(target_df[target], y_pred, pos_label=0),
+                    'precision_m' : precision_score(target_df[target], y_pred),
+                    'precision_a' : precision_score(target_df[target], y_pred, pos_label=0),
+                    'recall_m' : recall_score(target_df[target], y_pred),
+                    'recall_a' : recall_score(target_df[target], y_pred, pos_label=0)
                 }
                 results.append(new_row)
     return pd.DataFrame(results)
 # main 
 scenario_1_results = scenario_1_cross_project()
-scenario_1_results.to_csv('ML_scenario_1_results.csv',index=False)
+scenario_1_results.to_csv('ML_scenario_1_results_LR.csv',index=False)
 scenario_2_results = scenario_2_cross_project()
-scenario_2_results.to_csv('ML_scenario_2_results.csv',index=False)
+scenario_2_results.to_csv('ML_scenario_2_results_LR.csv',index=False)
 
 # Libreoffice
 # Eclipse: [0.643 0.951 0.852 0.23 ]

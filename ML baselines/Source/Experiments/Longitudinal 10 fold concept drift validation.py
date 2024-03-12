@@ -6,12 +6,14 @@ from sklearn.ensemble import RandomForestClassifier, ExtraTreesClassifier, Gradi
 from sklearn.linear_model import LogisticRegression
 import sys
 import os
+import numpy as np
 sys.path.append('../../')
 from Source.Util import *
 from imblearn.over_sampling import SMOTE 
 
 # to suppress convergence warning in LogisticRegression
 from warnings import simplefilter
+from sklearn.metrics import fbeta_score, make_scorer, matthews_corrcoef
 from sklearn.exceptions import ConvergenceWarning
 simplefilter("ignore", category=ConvergenceWarning)
 from sklearn.tree import DecisionTreeClassifier
@@ -19,6 +21,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import ExtraTreesClassifier
 from sklearn.model_selection import GridSearchCV
+from sklearn.model_selection import StratifiedKFold
 import pickle
 
 
@@ -26,51 +29,73 @@ import pickle
 best_n_estimators = 500
 best_learning_rate = 0.01
 APPLY_SMOTE = False 
+def get_best_model():
+    return LGBMClassifier(class_weight='balanced',n_estimators=best_n_estimators, learning_rate=best_learning_rate,
+                          subsample=0.9, subsample_freq=1, random_state=np.random.randint(seed))
 
 MODELS = {
-   
-    'DT' : {
+    'LGBM' : {
+        'default' : get_best_model(),
+        'hyperparameters' : {
+        }
+    },
+   'DT' : {
         'default' : DecisionTreeClassifier(),
         'hyperparameters': {
             'criterion': ['gini', 'entropy', 'log_loss'],
-            'max_depth' : [5, 10, None],
+            'max_depth' : [5, 10],
             'splitter' : ['best', 'random'], 
-            'class_weight' : ['balanced']
+            'class_weight' : ['balanced'],
+            'random_state':[seed]
         }
-    }
-    
-}
-
-"""
-'RF' : {
-        'default' : RandomForestClassifier(),
+    },
+    'ET' : {
+        'default' : ExtraTreesClassifier(),
         'hyperparameters' : {
             'criterion': ['gini', 'entropy', 'log_loss'],
             'max_depth' : [5, 10, None],
             'n_estimators' : [100, 500],
-            'class_weight' : ['balanced']
+            'class_weight' : ['balanced'], 
+            'random_state':[seed]
         }
     },
- 'LR' : {
+    'RF' : {
+            'default' : RandomForestClassifier(),
+            'hyperparameters' : {
+                'criterion': ['gini', 'entropy', 'log_loss'],
+                'max_depth' : [5, 10, None],
+                'n_estimators' : [100, 500],
+                'class_weight' : ['balanced'],
+                'random_state':[seed]
+            }
+        },
+    'LR' : {
         'default' : LogisticRegression(),
         'hyperparameters' : {
             'penalty' : ['l1','l2', 'elasticnet', 'none'],
             'C' : [0.01,0.1,1.0],
             'max_iter' : [10000],
             'class_weight' : ['balanced'],
-            'solver' : ['newton-cg', 'lbfgs', 'liblinear', 'sag', 'saga']
+            'solver' : ['newton-cg', 'lbfgs', 'liblinear', 'sag', 'saga'],
+            'random_state':[seed]
 
         }
-    },
-    'LGBM' : {
-        'default' : LGBMClassifier(),
+    }
+}
+
+"""
+'LGBM' : {
+        'default' : get_best_model(),
         'hyperparameters' : {
-            
-            'learning_rate': [0.01, 0.1, 0.3],
-            'max_depth' : [5, 10, None],
-            'n_estimators' : [100, 500],
-            'class_weight' : ['balanced'],
-            'objective' : ['binary']
+        }
+    },
+   'DT' : {
+        'default' : DecisionTreeClassifier(),
+        'hyperparameters': {
+            'criterion': ['gini', 'entropy', 'log_loss'],
+            'max_depth' : [5, 10],
+            'splitter' : ['best', 'random'], 
+            'class_weight' : ['balanced']
         }
     },
     'ET' : {
@@ -82,6 +107,30 @@ MODELS = {
             'class_weight' : ['balanced']
         }
     }
+    
+'RF' : {
+        'default' : RandomForestClassifier(),
+        'hyperparameters' : {
+            'criterion': ['gini', 'entropy', 'log_loss'],
+            'max_depth' : [5, 10, None],
+            'n_estimators' : [100, 500],
+            'class_weight' : ['balanced']
+        }
+    },
+    
+'RF' : {
+        'default' : RandomForestClassifier(),
+        'hyperparameters' : {
+            'criterion': ['gini', 'entropy', 'log_loss'],
+            'max_depth' : [5, 10, None],
+            'n_estimators' : [100, 500],
+            'class_weight' : ['balanced']
+        }
+    },
+ 
+    
+    
+
 """
 def prepare_data_GP(df) : 
     clean_df = df.copy()
@@ -100,16 +149,18 @@ def main():
     for project_name in projects: 
 
         project = project_name
-        data_folder = "../../Data"
+        data_folder = "../../Datasets"
         root = f"{data_folder}/{project}"
         change_folder = "change"
         change_directory_path = f'{root}/{change_folder}'
         changes_root = f"{root}/changes"
         diff_root = f'{root}/diff'
 
-        result_folder = "../../Results"
+        result_folder = "../../Results_concept_drift/LR_MODEL"
+        os.makedirs(result_folder, exist_ok=True)
         result_project_folder = f"{result_folder}/{project}"
         print(project)
+        os.makedirs(result_project_folder, exist_ok=True)
         df = pd.read_csv(f'{root}/{project}.csv')
         df_copy = df.copy()
 
@@ -117,9 +168,9 @@ def main():
         scaler = StandardScaler()
         df[feature_list] = scaler.fit_transform(df[feature_list])
         #selecting_classifier(df)
-        #res = concept_drift_validation(df, df_copy, scaler,models= MODELS, folds_prefix_number = 5)
+        res = concept_drift_validation(df, df_copy, scaler,models= MODELS, folds_prefix_number = 5)
         # this method does new author and effectiveness result also.
-        cross_validation(df, df_copy, scaler)
+        #cross_validation(df, df_copy, scaler)
 
         ## dimension wise results
         # dimension_validation(df)
@@ -132,9 +183,6 @@ def get_model():
     return LGBMClassifier(class_weight='balanced', subsample=0.9, subsample_freq=1, random_state=np.random.randint(seed))
 
 
-def get_best_model():
-    return LGBMClassifier(class_weight='balanced',n_estimators=best_n_estimators, learning_rate=best_learning_rate,
-                          subsample=0.9, subsample_freq=1, random_state=np.random.randint(seed))
 
 
 def selecting_classifier(df):
@@ -273,9 +321,9 @@ def cross_validation(df, df_copy, scaler, models = MODELS):
     
     feature_list = get_initial_feature_list()
     scores = [0] * 9
-    datapath_gp = f"C:/Users/Moataz/Desktop/work/code_review_delay_prediction/early_abondon_prediction/{project}"
+    #datapath_gp = f"C:/Users/Motaz/Desktop/work/code_review_delay_prediction/early_abondon_prediction/{project}"
     all_results = []
-    os.makedirs(datapath_gp,exist_ok=True)
+    #os.makedirs(datapath_gp,exist_ok=True)
     for model_name, model_data in MODELS.items(): 
         train_results = None
         test_results = None
@@ -299,12 +347,12 @@ def cross_validation(df, df_copy, scaler, models = MODELS):
                 
                 indicies.append((list(range(train_size - 1)),list(range(train_size,test_size - 1))))
             #indicies = [(df.shape[0] * fold // folds, min(df.shape[0] * (fold + 1) // folds, df.shape[0])) for fold in range(1,folds) ]
-            grid_search = GridSearchCV(model_data['default'], model_data['hyperparameters'],cv=indicies,scoring='roc_auc')
-            grid_search.fit(df.loc[:, feature_list], df.loc[:, target])
+            grid_search = GridSearchCV(model_data['default'], model_data['hyperparameters'],cv=StratifiedKFold(n_splits=10),scoring='roc_auc')
+            #grid_search.fit(df.loc[:, feature_list], df.loc[:, target])
             cv_objects_path = os.path.join(result_project_folder,project,model_name)
             os.makedirs(cv_objects_path,exist_ok=True)
             pickle.dump(grid_search,file=open(f'{cv_objects_path}/{project}_{model_name}_cross_val_run_{run}.pk', 'wb'))
-            clf = grid_search.best_estimator_
+            #clf = grid_search.best_estimator_
             for fold in range(1, folds):
                 train_size = df.shape[0] * fold // folds
                 test_size = min(df.shape[0] * (fold + 1) // folds, df.shape[0])
@@ -316,40 +364,40 @@ def cross_validation(df, df_copy, scaler, models = MODELS):
                 clean_df = prepare_data_GP(df_copy) 
                 train_df = clean_df.iloc[:train_size - 1]
                 test_df = clean_df.iloc[train_size:test_size - 1]
-                train_df.to_csv(os.path.join(datapath_gp,f"{project}_train_{fold - 1}.csv"),index = False)
-                train_df.to_csv(os.path.join(datapath_gp,f"{project}_new_developer_train_{fold - 1}.csv"),index = False)
-                test_df.to_csv(os.path.join(datapath_gp,f"{project}_test_{fold - 1}.csv"),index = False)
-                test_new = df_copy[train_size:test_size]
-                test_new = test_new[test_new['total_change_num'] < 10]
-                test_new_gp = prepare_data_GP(test_new)
-                test_new_gp.to_csv(os.path.join(datapath_gp,f"{project}_new_developer_test_{fold - 1}.csv"),index = False)
+                #train_df.to_csv(os.path.join(datapath_gp,f"{project}_train_{fold - 1}.csv"),index = False)
+                #train_df.to_csv(os.path.join(datapath_gp,f"{project}_new_developer_train_{fold - 1}.csv"),index = False)
+                #test_df.to_csv(os.path.join(datapath_gp,f"{project}_test_{fold - 1}.csv"),index = False)
+                #test_new = df_copy[train_size:test_size]
+                #test_new = test_new[test_new['total_change_num'] < 10]
+                #test_new_gp = prepare_data_GP(test_new)
+                #test_new_gp.to_csv(os.path.join(datapath_gp,f"{project}_new_developer_test_{fold - 1}.csv"),index = False)
                 print('train_size:',len(x_train))
                 print('test_size:',len(x_test))
-                continue 
                 start = time.time()
                 #clf = get_best_model()
                 if APPLY_SMOTE: 
                     print('applying smote')
                     sm = SMOTE(random_state=42)
                     x_train, y_train = sm.fit_resample(x_train, y_train)
-                clf.fit(x_train, y_train)
+                grid_search = GridSearchCV(model_data['default'], model_data['hyperparameters'],cv=StratifiedKFold(n_splits=10), scoring='roc_auc')
+                grid_search.fit(x_train, y_train)
                 train_time[fold].append(time.time() - start)
 
-                y_prob = clf.predict_proba(x_train)[:, 1]
+                y_prob = grid_search.predict_proba(x_train)[:, 1]
                 train_result.calculate_result(y_train, y_prob, fold, False)
 
                 start = time.time()
-                y_prob = clf.predict_proba(x_test)[:, 1]
+                y_prob = grid_search.predict_proba(x_test)[:, 1]
                 test_time[fold].append(time.time() - start)
                 test_result.calculate_result(y_test, y_prob, fold, False)
-
+                print(test_result.get_df())
                 for k in range(1, 10):
                     score = Result.cost_effectiveness(y_test, y_prob, k*10)
                     scores[k-1] += score
 
                 test_new = df_copy[train_size:test_size]
                 test_new = test_new[test_new['total_change_num'] < 10]
-                y_prob = clf.predict_proba(scaler.transform(test_new[feature_list]))[:, 1]
+                y_prob = grid_search.predict_proba(scaler.transform(test_new[feature_list]))[:, 1]
                 new_author_result.calculate_result(test_new[target], y_prob, fold, False)
 
                 #feature_importances.append(clf.feature_importances_)
@@ -375,32 +423,30 @@ def cross_validation(df, df_copy, scaler, models = MODELS):
             new_author_result_df['model_id'] = "best_performance_model"
             new_author_result_df['project'] = project
             new_author_result_df['run'] = run
-            continue 
             all_results += [train_result_df,test_result_df]
             if run:
-                train_results = pd.concat(train_results,train_result_df)
-                test_results = pd.concat(test_results,test_result_df)
-                new_author_results =pd.concat(new_author_results,new_author_result_df) 
+                train_results = pd.concat([train_results,train_result_df])
+                test_results = pd.concat([test_results,test_result_df])
+                new_author_results =pd.concat([new_author_results,new_author_result_df]) 
             else:
                 train_results = train_result_df
                 test_results = test_result_df
                 new_author_results = new_author_result_df
-        continue
         print(test_results.head(30))
         result_df = pd.DataFrame({"train": train_results.median(), "test": test_results.median(),
                                 "new_developers":new_author_results.median()}).reset_index()
         print(result_df)
 
-        print("Effectiveness")
-        for k in range(1, 10):
-            print(k*10, scores[k-1] / (runs*(folds - 1)))
+        #print("Effectiveness")
+        #for k in range(1, 10):
+         #   print(k*10, scores[k-1] / (runs*(folds - 1)))
 
         # average time
-        for fold in range(1, folds):
-            train_time[fold] = np.mean(train_time[fold])
-            test_time[fold] = np.mean(test_time[fold])
-        train_results['time'] = train_time.values()
-        test_results['time'] = test_time.values()
+        #for fold in range(1, folds):
+         #   train_time[fold] = np.mean(train_time[fold])
+          #  test_time[fold] = np.mean(test_time[fold])
+        #train_results['time'] = train_time.values()
+        #test_results['time'] = test_time.values()
 
         train_results.to_csv(f'{result_project_folder}/{project}_{model_name}_train_result_cross.csv', index=False, float_format='%.3f')
         test_results.to_csv(f'{result_project_folder}/{project}_{model_name}_test_result_cross.csv', index=False, float_format='%.3f')
@@ -413,10 +459,8 @@ def cross_validation(df, df_copy, scaler, models = MODELS):
         #feature_importance_df = feature_importance_df.sort_values(by='importance', ascending=False).reset_index(drop=True)
         #feature_importance_df.to_csv(f'{result_project_folder}/{project}_feature_importance_cross.csv', index=False,
         #                            float_format='%.3f')
-        print()
-    return
     all_results = pd.concat(all_results)
-    all_results.to_csv(f'{result_project_folder}/{project}_all_models.csv', index=False, float_format='%.3f')
+    all_results.to_csv(f'{result_project_folder}/just_try_{project}_all_models.csv', index=False, float_format='%.3f')
 
 def dimension_validation(df):
     print("Varying dimensions")
@@ -455,7 +499,7 @@ def concept_drift_validation(df, df_copy, scaler, models = MODELS, folds_prefix_
     print("Concept drift validation")
     feature_list = get_initial_feature_list()
     scores = [0] * 9
-    datapath_gp = f"C:/Users/Moataz/Desktop/work/code_review_delay_prediction/early_abondon_prediction/concept_drift_val/{project}"
+    datapath_gp = f"C:/Users/Motaz/Desktop/work/code_review_delay_prediction/early_abondon_prediction/concept_drift_val/{project}"
     all_results = []
     os.makedirs(datapath_gp,exist_ok=True)
     new_data_indicies = []
@@ -491,20 +535,18 @@ def concept_drift_validation(df, df_copy, scaler, models = MODELS, folds_prefix_
             indicies = []
             print(f'run {run} cross val')
             #indicies = [(df.shape[0] * fold // folds, min(df.shape[0] * (fold + 1) // folds, df.shape[0])) for fold in range(1,folds) ]
-            print('fitting model for old data')
-            old_grid_search = GridSearchCV(model_data['default'], model_data['hyperparameters'],cv=old_data_indicies,scoring='roc_auc')
-            old_grid_search.fit(df.loc[:, feature_list], df.loc[:, target])
-            print('fitting model for new data')
-            new_grid_search = GridSearchCV(model_data['default'], model_data['hyperparameters'],cv=new_data_indicies,scoring='roc_auc')
-            new_grid_search.fit(df.loc[:, feature_list], df.loc[:, target])
+            #old_grid_search = GridSearchCV(model_data['default'], model_data['hyperparameters'],cv=old_data_indicies,scoring='roc_auc')
+            #old_grid_search.fit(df.loc[:, feature_list], df.loc[:, target])
+            #new_grid_search = GridSearchCV(model_data['default'], model_data['hyperparameters'],cv=new_data_indicies,scoring='roc_auc')
+            #new_grid_search.fit(df.loc[:, feature_list], df.loc[:, target])
             cv_objects_path = os.path.join(result_project_folder,project,'concept_drift',model_name)
             os.makedirs(cv_objects_path,exist_ok=True)
 
-            pickle.dump(old_grid_search,file=open(f'{cv_objects_path}/{project}_{model_name}_old_cross_val_run_{run}.pk', 'wb'))
-            pickle.dump(new_grid_search,file=open(f'{cv_objects_path}/{project}_{model_name}_new_cross_val_run_{run}.pk', 'wb'))
+            #pickle.dump(old_grid_search,file=open(f'{cv_objects_path}/{project}_{model_name}_old_cross_val_run_{run}.pk', 'wb'))
+            #pickle.dump(new_grid_search,file=open(f'{cv_objects_path}/{project}_{model_name}_new_cross_val_run_{run}.pk', 'wb'))
 
-            old_clf= old_grid_search.best_estimator_
-            new_clf= new_grid_search.best_estimator_
+            #old_clf= old_grid_search.best_estimator_
+            #new_clf= new_grid_search.best_estimator_
             for iteration in range(1,folds_prefix_number + 1) : 
                 old_data_train_end_index = df.shape[0] * folds_prefix_number  // folds
                 new_data_train_start_index = df.shape[0] * iteration  // folds
@@ -517,30 +559,33 @@ def concept_drift_validation(df, df_copy, scaler, models = MODELS, folds_prefix_
                 
                 x_test, y_test = df.loc[test_data_start_index:test_data_end_index - 1, feature_list], df.loc[test_data_start_index:test_data_end_index - 1, target]
 
-                
+                new_grid_search = GridSearchCV(model_data['default'], model_data['hyperparameters'],cv=StratifiedKFold(n_splits=10),scoring='roc_auc', refit=True)
+                new_grid_search.fit(x_train_new, y_train_new)
+                old_grid_search = GridSearchCV(model_data['default'], model_data['hyperparameters'],cv=StratifiedKFold(n_splits=10),scoring='roc_auc', refit=True)
+                old_grid_search.fit(x_train_old, y_train_old)
                 clean_df = prepare_data_GP(df_copy) 
                 old_train_df = clean_df.iloc[:old_data_train_end_index - 1]
                 new_train_df = clean_df.iloc[new_data_train_start_index:new_data_train_end_index - 1]
                 test_df = clean_df.iloc[test_data_start_index:test_data_end_index - 1]
 
-                old_train_df.to_csv(os.path.join(datapath_gp,f"{project}_old_train_{iteration - 1}.csv"),index = False)
-                new_train_df.to_csv(os.path.join(datapath_gp,f"{project}_new_train_{iteration - 1}.csv"),index = False)
+                #old_train_df.to_csv(os.path.join(datapath_gp,f"{project}_old_train_{iteration - 1}.csv"),index = False)
+                #new_train_df.to_csv(os.path.join(datapath_gp,f"{project}_new_train_{iteration - 1}.csv"),index = False)
 
                 test_df.to_csv(os.path.join(datapath_gp,f"{project}_old_test_{iteration - 1}.csv"),index = False)
                 test_df.to_csv(os.path.join(datapath_gp,f"{project}_new_test_{iteration - 1}.csv"),index = False)
                 #start = time.time()
                 #clf = get_best_model()
                 
-                old_clf.fit(x_train_old, y_train_old)
-                new_clf.fit(x_train_new, y_train_new)
+                #old_clf.fit(x_train_old, y_train_old)
+                #new_clf.fit(x_train_new, y_train_new)
 
                 #train_time[fold].append(time.time() - start)
 
-                old_train_result.calculate_result(y_train_old, old_clf.predict_proba(x_train_old)[:, 1], iteration, False)
-                new_train_result.calculate_result(y_train_new, new_clf.predict_proba(x_train_new)[:, 1], iteration, False)
+                old_train_result.calculate_result(y_train_old, old_grid_search.predict_proba(x_train_old)[:, 1], iteration, False)
+                new_train_result.calculate_result(y_train_new, new_grid_search.predict_proba(x_train_new)[:, 1], iteration, False)
 
-                new_test_result.calculate_result(y_test,  new_clf.predict_proba(x_test)[:, 1], iteration, False)
-                old_test_result.calculate_result(y_test,  old_clf.predict_proba(x_test)[:, 1], iteration, False)
+                new_test_result.calculate_result(y_test,  new_grid_search.predict_proba(x_test)[:, 1], iteration, False)
+                old_test_result.calculate_result(y_test,  old_grid_search.predict_proba(x_test)[:, 1], iteration, False)
 
                 #test_new = df_copy[train_size:test_size]
                 #test_new = test_new[test_new['total_change_num'] < 10]
@@ -554,7 +599,7 @@ def concept_drift_validation(df, df_copy, scaler, models = MODELS, folds_prefix_
 
             new_test_result_df = new_test_result.get_df()
             old_test_result_df = old_test_result.get_df()
-            print(old_train_result_df.head())
+            print(new_test_result_df.head())
             print(old_test_result_df.head())
             #new_author_result_df = new_author_result.get_df()
             new_train_result_df['algorithm'] = model_name + '_new'
